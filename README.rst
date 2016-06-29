@@ -16,7 +16,7 @@ Kettle parse can be used to access a variety of metadata from your transformatio
 Steps
 ~~~~~
 
-All steps in your transformation are stored as a dictionary with the step name as the key and a dictionary of attributes as the value.:
+All steps in your transformation can be accessed by the ``steps`` attribute which is a dictionary with the step name as the key and a dictionary of attributes as the value:
 
 .. code-block:: python
 
@@ -38,7 +38,7 @@ To filter by enabled or disabled steps use the ``get_enabled_steps()`` or ``get_
 Hops
 ~~~~
 
-All hops in your transformation can be accessed by ``hops`` attribute. Each individual hops contain step originating from, step going to, if the hop is enabled, and if the hop is an error handling hop:
+All hops in your transformation can be accessed by the ``hops`` attribute. Each individual hops contain step originating from, step going to, if the hop is enabled, and if the hop is an error handling hop:
 
 .. code-block:: python
 
