@@ -66,7 +66,7 @@ You can also find all paths between two steps by using the ``find_all_paths()`` 
 Installation
 ------------
 
-To install GIQLogging, simply:
+To install KettleParser, simply:
 
 .. code-block:: bash
 
