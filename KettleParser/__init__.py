@@ -1,3 +1,4 @@
+import os
 import xml.etree.ElementTree as ET
 from itertools import permutations
 
@@ -26,7 +27,7 @@ class ParseKettleXml(object):
         :param data: str, File pointer or string of kettle XML
         :param is_file: bool, Whether or not data param is a file pointer
         """
-        self.data = data
+        self.xml_data = data
         self.is_file = is_file
 
         # Default class parameters
@@ -44,15 +45,17 @@ class ParseKettleXml(object):
 
         # Parse file to extract metadata
         if self.is_file:
-            self.verify_file_type()
+            self._verify_file()
         self._parse_xml()
 
 
-    def verify_file_type(self):
+    def _verify_file(self):
         """
         Verify file ending is acceptable
         """
-        if self.data[-4:] not in self._FILE_ENDINGS:
+        if not os.path.isfile(self.xml_data):
+            raise KettleException("{} does not exist".format(self.xml_data))
+        if os.path.splitext(self.xml_data)[1] not in self._FILE_ENDINGS:
             raise KettleException("Invalid Kettle file")
 
 
@@ -67,9 +70,9 @@ class ParseKettleXml(object):
         """
         try:
             if self.is_file:
-                self.root = ET.parse(self.data).getroot()
+                self.root = ET.parse(self.xml_data).getroot()
             else:
-                self.root = ET.fromstring(self.data)
+                self.root = ET.fromstring(self.xml_data)
         except:
             raise KettleException("Could not parse XML")
 
@@ -149,9 +152,9 @@ class ParseKettleXml(object):
         :return: list, connection XML elements
         """
         if self.is_file:
-            self.root = ET.parse(self.data).getroot()
+            self.root = ET.parse(self.xml_data).getroot()
         else:
-            self.root = ET.fromstring(self.data)
+            self.root = ET.fromstring(self.xml_data)
 
         if self.file_type == "transformation":
             for connection in self.root.iter("connection"):
