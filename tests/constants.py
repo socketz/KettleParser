@@ -14,6 +14,8 @@ TRANSFORMATION_1_GRAPH = {'Text file input': ['Select values'],
                           'Filter rows': ['Dummy (do nothing)', 'Text file output'],
                           'Select values': ['Filter rows']}
 
+TRANSFORMATION_1_PATHS = [['Text file input', 'Select values', 'Filter rows', 'Text file output']]
+
 TRANSFORMATION_1_XML = """
 <?xml version="1.0" encoding="UTF-8"?>
 <transformation>
