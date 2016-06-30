@@ -242,16 +242,6 @@ class ParseKettleXml(object):
                 yield sub
 
 
-    def build_step_permutations(self, length=2):
-        """
-        Build step permutations for all steps
-        :param length: length of each permutation
-        :return:
-        """
-        types = [meta["type"] for step, meta in self.steps.iteritems()]
-        return [tuple(pair) for pair in permutations(types, length)]
-
-
     def get_enabled_hops(self):
         return [hop for hop in self.hops if hop["enabled"]]
 
