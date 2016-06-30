@@ -21,14 +21,12 @@ class ParseKettleXml(object):
     _HOP_ENABLED = {"Y": True, "N": False}
     _ERROR_ENABLED = {"N": True, "Y": False}
 
-    def __init__(self, data, is_file=True):
+    def __init__(self, data):
         """
         Create object for kettle parsing.
-        :param data: str, File pointer or string of kettle XML
-        :param is_file: bool, Whether or not data param is a file pointer
+        :param data: str, path to kettle file
         """
         self.xml_data = data
-        self.is_file = is_file
 
         # Default class parameters
         self.file_type = ""
@@ -44,8 +42,7 @@ class ParseKettleXml(object):
         self.connections = []
 
         # Parse file to extract metadata
-        if self.is_file:
-            self._verify_file()
+        self._verify_file()
         self._parse_xml()
 
 
@@ -69,10 +66,7 @@ class ParseKettleXml(object):
         Also calls parse_steps/parse_hops to get step/hop information
         """
         try:
-            if self.is_file:
-                self.root = ET.parse(self.xml_data).getroot()
-            else:
-                self.root = ET.fromstring(self.xml_data)
+            self.root = ET.parse(self.xml_data).getroot()
         except:
             raise KettleException("Could not parse XML")
 
@@ -151,10 +145,7 @@ class ParseKettleXml(object):
         Get list of connection XML element objects. Specify certain access type if desired to narrow results.
         :return: list, connection XML elements
         """
-        if self.is_file:
-            self.root = ET.parse(self.xml_data).getroot()
-        else:
-            self.root = ET.fromstring(self.xml_data)
+        self.root = ET.parse(self.xml_data).getroot()
 
         if self.file_type == "transformation":
             for connection in self.root.iter("connection"):
