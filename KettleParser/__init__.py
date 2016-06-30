@@ -30,7 +30,6 @@ class ParseKettleXml(object):
 
         # Default class parameters
         self.file_type = ""
-        self.root = None
         self.steps = {}
         self.steps_xml = {}
         self.hops = []
@@ -66,35 +65,35 @@ class ParseKettleXml(object):
         Also calls parse_steps/parse_hops to get step/hop information
         """
         try:
-            self.root = ET.parse(self.xml_data).getroot()
-        except:
+            xml_root = ET.parse(self.xml_data).getroot()
+        except ET.ParseError:
             raise KettleException("Could not parse XML")
 
-        if self.root.tag == "transformation":
+        if xml_root.tag == "transformation":
             self.file_type = "transformation"
-            self.name = self._get_text(self.root, "./info/name")
+            self.name = self._get_text(xml_root, "./info/name")
             self.step_node = "step"
 
-        elif self.root.tag == "job":
+        elif xml_root.tag == "job":
             self.file_type = "job"
-            self.name = self._get_text(self.root, "./name")
+            self.name = self._get_text(xml_root, "./name")
             self.step_node = "entry"
 
-        self._parse_steps()
-        self._parse_hops()
-        self._parse_connections()
+        self._parse_steps(xml_root)
+        self._parse_hops(xml_root)
+        self._parse_connections(xml_root)
         self._build_graph()
         self.build_permutations(length=2)
 
 
-    def _parse_steps(self):
+    def _parse_steps(self, xml_root):
         """
         Build dictionary of steps key="name", value="type", since name is always
         going to be unique
         """
         # Loop through all steps
         try:
-            for step in self.root.iter(self.step_node):
+            for step in xml_root.iter(self.step_node):
                 try:
                     self.steps[self._get_text(step, "name")] = {"type": self._get_text(step, "type")}
                     self.steps_xml[self._get_text(step, "name")] = step
@@ -105,7 +104,7 @@ class ParseKettleXml(object):
             raise KettleException(e.message)
 
 
-    def _parse_hops(self):
+    def _parse_hops(self, xml_root):
         """
         Parse hop metadata and construct hop property ("step_name_from", "step_name_to", "enabled")
             step_name_from: str, name of step that hop originates from
@@ -114,10 +113,10 @@ class ParseKettleXml(object):
             ex: (Sort rows, Group by, True)
         """
         if self.file_type == "transformation":
-            self._parse_error_handling_trans()
+            self._parse_error_handling_trans(xml_root)
         # Loop through all hops
         try:
-            for hop in self.root.iter("hop"):
+            for hop in xml_root.iter("hop"):
                 _is_enabled = self._HOP_ENABLED[self._get_text(hop, "enabled")]
                 _step_from = self._get_text(hop, "from")
                 _step_to = self._get_text(hop, "to")
@@ -140,15 +139,14 @@ class ParseKettleXml(object):
             raise KettleException(e.message)
 
 
-    def _parse_connections(self):
+    def _parse_connections(self, xml_root):
         """
         Get list of connection XML element objects. Specify certain access type if desired to narrow results.
         :return: list, connection XML elements
         """
-        self.root = ET.parse(self.xml_data).getroot()
 
         if self.file_type == "transformation":
-            for connection in self.root.iter("connection"):
+            for connection in xml_root.iter("connection"):
                 try:
                     conn = {"name": self._get_text(connection, "name"),
                             "server": self._get_text(connection, "server"),
@@ -161,9 +159,9 @@ class ParseKettleXml(object):
             self.connections.append(conn)
 
 
-    def _parse_error_handling_trans(self):
+    def _parse_error_handling_trans(self, xml_root):
         try:
-            for error_handle in self.root.iter("error"):
+            for error_handle in xml_root.iter("error"):
                 try:
                     self.error_handling.append({"from": self.steps[self._get_text(error_handle, "source_step")],
                                                 "to": self.steps[self._get_text(error_handle, "target_step")],
