@@ -36,7 +36,6 @@ class ParseKettleXml(object):
         self.steps = {}
         self.steps_xml = {}
         self.hops = []
-        self.perms = []
         self.error_handling = []
         self.name = ""
         self.graph = {}
@@ -83,7 +82,6 @@ class ParseKettleXml(object):
         self._parse_hops(xml_root)
         self._parse_connections(xml_root)
         self._build_graph()
-        self.build_permutations(length=2)
 
 
     def _parse_steps(self, xml_root):
@@ -244,14 +242,14 @@ class ParseKettleXml(object):
                 yield sub
 
 
-    def build_permutations(self, length=2):
+    def build_step_permutations(self, length=2):
         """
         Build step permutations for all steps
         :param length: length of each permutation
         :return:
         """
         types = [meta["type"] for step, meta in self.steps.iteritems()]
-        self.perms = [tuple(pair) for pair in permutations(types, length)]
+        return [tuple(pair) for pair in permutations(types, length)]
 
 
     def get_enabled_hops(self):
