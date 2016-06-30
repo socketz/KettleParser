@@ -22,8 +22,7 @@ class ParseKettleXml(object):
     # Elements to extract from step xml
     _STEPITEMS = ["name", "type"]
     # Hop elements
-    _HOP_ENABLED = {"Y": True, "N": False}
-    _ERROR_ENABLED = {"N": True, "Y": False}
+    _ENABLED = {"Y": True, "N": False}
 
     def __init__(self, data):
         """
@@ -117,24 +116,22 @@ class ParseKettleXml(object):
             enabled: bool, is hop enabled?
             ex: (Sort rows, Group by, True)
         """
-        if self.file_type == "transformation":
-            self._parse_error_handling_trans(xml_root)
+        if self.file_type == 1:
+            error_hops = self._parse_error_handling_trans(xml_root)
         # Loop through all hops
         try:
             for hop in xml_root.iter("hop"):
-                _is_enabled = self._HOP_ENABLED[self._get_text(hop, "enabled")]
+                _is_enabled = self._ENABLED[self._get_text(hop, "enabled")]
                 _step_from = self._get_text(hop, "from")
                 _step_to = self._get_text(hop, "to")
 
                 # Check for error handling
                 _is_error = False
-                if self.file_type == "transformation":
-                    for error in self.error_handling:
-                        if error["from"] == _step_from and error["to"] == _step_to:
-                            _is_error = True
-                else:
-                    _is_error = self._ERROR_ENABLED[self._get_text(hop, "evaluation")]
-
+                for error in error_hops:
+                    if error["from"] == _step_from and error["to"] == _step_to:
+                        _is_error = True
+                    else:
+                        _is_error = self._ENABLED[self._get_text(hop, "evaluation")]
 
                 self.hops.append({"from": _step_from,
                                   "to": _step_to,
@@ -165,17 +162,18 @@ class ParseKettleXml(object):
 
 
     def _parse_error_handling_trans(self, xml_root):
+        error_handling = []
         try:
             for error_handle in xml_root.iter("error"):
                 try:
-                    self.error_handling.append({"from": self.steps[self._get_text(error_handle, "source_step")],
-                                                "to": self.steps[self._get_text(error_handle, "target_step")],
-                                                "enabled": self._HOP_ENABLED[
-                                                    self._get_text(error_handle, "is_enabled")]})
+                    error_handling.append({"from": self.steps[self._get_text(error_handle, "source_step")],
+                                           "to": self.steps[self._get_text(error_handle, "target_step")],
+                                           "enabled": self._ENABLED[self._get_text(error_handle, "is_enabled")]})
                 except KeyError:
                     continue
         except AttributeError, e:
             raise KettleException(e.message)
+        return error_handling
 
 
     def _build_graph(self):
