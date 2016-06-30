@@ -12,6 +12,10 @@ class KettleException(Exception):
 class ParseKettleXml(object):
     """
     Parses kettle .ktr and .kjb files for easy manipulation by other tools
+
+    File Types
+        1: Transformation
+        2: Job
     """
     # Acceptable file endings
     _FILE_ENDINGS = [".ktr", ".kjb"]
@@ -36,7 +40,6 @@ class ParseKettleXml(object):
         self.perms = []
         self.error_handling = []
         self.name = ""
-        self.step_node = ""
         self.graph = {}
         self.connections = []
 
@@ -70,14 +73,12 @@ class ParseKettleXml(object):
             raise KettleException("Could not parse XML")
 
         if xml_root.tag == "transformation":
-            self.file_type = "transformation"
+            self.file_type = 1
             self.name = self._get_text(xml_root, "./info/name")
-            self.step_node = "step"
 
         elif xml_root.tag == "job":
-            self.file_type = "job"
+            self.file_type = 2
             self.name = self._get_text(xml_root, "./name")
-            self.step_node = "entry"
 
         self._parse_steps(xml_root)
         self._parse_hops(xml_root)
@@ -92,8 +93,12 @@ class ParseKettleXml(object):
         going to be unique
         """
         # Loop through all steps
+        if self.file_type == 1:
+            step_node = "step"
+        elif self.file_type == 2:
+            step_node = "entry"
         try:
-            for step in xml_root.iter(self.step_node):
+            for step in xml_root.iter(step_node):
                 try:
                     self.steps[self._get_text(step, "name")] = {"type": self._get_text(step, "type")}
                     self.steps_xml[self._get_text(step, "name")] = step
