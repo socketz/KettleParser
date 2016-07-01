@@ -33,7 +33,7 @@ For now, KettleParser only supports parsing complete Kettle files that are saved
 Steps
 ~~~~~
 
- All steps in your transformation can be iterated on via the ``steps`` attribute:
+All steps in your transformation can be iterated on via the ``steps`` attribute:
 
 .. code-block:: python
 
