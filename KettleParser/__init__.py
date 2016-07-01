@@ -31,7 +31,7 @@ class ParseKettleXml(object):
         self.xml_data = data
 
         # Default class parameters
-        self.file_type = ""
+        self.file_type = None
         self.steps = {}
         self.steps_xml = {}
         self.hops = []
