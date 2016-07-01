@@ -5,7 +5,7 @@ from itertools import permutations
 __author__ = 'jeffportwood'
 
 
-class KettleException(Exception):
+class KettleParserError(Exception):
     pass
 
 
@@ -36,7 +36,6 @@ class ParseKettleXml(object):
         self.steps = {}
         self.steps_xml = {}
         self.hops = []
-        self.error_handling = []
         self.name = ""
         self.graph = {}
         self.connections = []
@@ -51,9 +50,9 @@ class ParseKettleXml(object):
         Verify file ending is acceptable
         """
         if not os.path.isfile(self.xml_data):
-            raise KettleException("{} does not exist".format(self.xml_data))
+            raise KettleParserError("{} does not exist".format(self.xml_data))
         if os.path.splitext(self.xml_data)[1] not in self._FILE_ENDINGS:
-            raise KettleException("Invalid Kettle file")
+            raise KettleParserError("Invalid Kettle file")
 
 
     def _parse_xml(self):
@@ -68,15 +67,17 @@ class ParseKettleXml(object):
         try:
             xml_root = ET.parse(self.xml_data).getroot()
         except ET.ParseError:
-            raise KettleException("Could not parse XML")
+            raise KettleParserError("Could not parse XML")
 
         if xml_root.tag == "transformation":
             self.file_type = 1
             self.name = self._get_text(xml_root, "./info/name")
-
         elif xml_root.tag == "job":
             self.file_type = 2
             self.name = self._get_text(xml_root, "./name")
+        else:
+            raise KettleParserError("Invalid Kettle file")
+
 
         self._parse_steps(xml_root)
         self._parse_hops(xml_root)
@@ -103,7 +104,7 @@ class ParseKettleXml(object):
                     # no "text" typically means a nested step element, so let's ignore for now
                     continue
         except AttributeError, e:
-            raise KettleException(e.message)
+            raise KettleParserError(e.message)
 
 
     def _parse_hops(self, xml_root):
@@ -136,7 +137,7 @@ class ParseKettleXml(object):
                                   "enabled": _is_enabled,
                                   "error": _is_error})
         except AttributeError, e:
-            raise KettleException(e.message)
+            raise KettleParserError(e.message)
 
 
     def _parse_connections(self, xml_root):
@@ -170,7 +171,7 @@ class ParseKettleXml(object):
                 except KeyError:
                     continue
         except AttributeError, e:
-            raise KettleException(e.message)
+            raise KettleParserError(e.message)
         return error_handling
 
 
@@ -186,7 +187,6 @@ class ParseKettleXml(object):
                 self.graph[hop["from"]] = [hop["to"]]
             else:
                 self.graph[hop["from"]].append(hop["to"])
-        return self.graph
 
 
     def _get_text(self, element, path):
@@ -219,7 +219,7 @@ class ParseKettleXml(object):
         try:
             self.steps[step_name][attribute] = self.steps_xml[step_name].find(attribute).text
         except AttributeError, e:
-            raise KettleException("Invalid attribute {} for step {}".format(attribute, step_name))
+            raise KettleParserError("Invalid attribute {} for step {}".format(attribute, step_name))
         return self.steps[step_name][attribute]
 
 
