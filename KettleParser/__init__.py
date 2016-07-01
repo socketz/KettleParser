@@ -39,8 +39,6 @@ class Parse(object):
     _STEPITEMS = ["name", "type"]
     # Hop elements
     _ENABLED = {"Y": True, "N": False}
-    # Connection attributes
-    _CONNECTION_ATTRIBUTES = ["name", "server", "type", "access", "database", "username"]
 
     def __init__(self, kettle_file):
 
@@ -98,7 +96,6 @@ class Parse(object):
         self._parse_hops(xml_root)
         self._parse_connections(xml_root)
         self._parse_error_handling(xml_root)
-        self._build_graph()
 
 
     def _parse_steps(self, xml_root):
@@ -131,8 +128,6 @@ class Parse(object):
         """
         for connection_elem in xml_root.findall("connection"):
             connection = KettleNode(connection_elem)
-            for attribute in self._CONNECTION_ATTRIBUTES:
-                connection.get_attribute(attribute)
             self.connections.append(connection)
 
 
@@ -142,38 +137,6 @@ class Parse(object):
         """
         for error_elem in xml_root.findall("./step_error_handling/error"):
             self.error_hops.append(KettleNode(error_elem))
-
-
-    def _build_graph(self):
-        """
-        Only include hops that are enabled.
-        """
-        for hop in self.hops:
-            if not hop.get_attribute("enabled"):
-                continue
-            if hop.get_attribute("from") not in self.graph:
-                self.graph[hop.get_attribute("from")] = [hop.get_attribute("to")]
-            else:
-                self.graph[hop.get_attribute("from")].append(hop.get_attribute("to"))
-
-
-    def find_all_paths(self, start, end, path=None):
-        """
-        Recursive DFS algorithm to find all possible paths between start and end node. Using a
-        generator allows the user to only compute the desired amount of paths.
-        Adapted from: http://eddmann.com/posts/depth-first-search-and-breadth-first-search-in-python/
-        :param start: str, start node
-        :param end: str, end node
-        :return: list, all possible paths
-        """
-        if path is None:
-            path = [start]
-        if start == end:
-            yield path
-        next_items = [item for item in self.graph.get(start, []) if item not in set(path)]
-        for next in next_items:
-            for sub in self.find_all_paths(next, end, path + [next]):
-                yield sub
 
 
     def get_enabled_hops(self):
