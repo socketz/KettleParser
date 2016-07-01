@@ -213,3 +213,42 @@ class Parse(object):
                 if source == hop.get_attribute("from") and target == hop.get_attribute("to"):
                     error_hops.append(hop)
         return error_hops
+
+
+class KettleGraph(object):
+    def __init__(self, hops):
+        """
+        :param hops: list of hop objects
+        :param only_enabled:
+        """
+        self.graph = {}
+
+        self._build_graph(hops)
+
+
+    def _build_graph(self, hops):
+        assert isinstance(hops, list)
+        for hop in hops:
+            if hop.get_attribute("from") not in self.graph:
+                self.graph[hop.get_attribute("from")] = [hop.get_attribute("to")]
+            else:
+                self.graph[hop.get_attribute("from")].append(hop.get_attribute("to"))
+
+
+    def find_all_paths(self, start, end, path=None):
+        """
+        Recursive DFS algorithm to find all possible paths between start and end node. Using a
+        generator allows the user to only compute the desired amount of paths.
+        Adapted from: http://eddmann.com/posts/depth-first-search-and-breadth-first-search-in-python/
+        :param start: str, start node
+        :param end: str, end node
+        :return: list, all possible paths
+        """
+        if path is None:
+            path = [start]
+        if start == end:
+            yield path
+        next_items = [item for item in self.graph.get(start, []) if item not in set(path)]
+        for next in next_items:
+            for sub in self.find_all_paths(next, end, path + [next]):
+                yield sub
