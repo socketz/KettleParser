@@ -8,7 +8,24 @@ class KettleParserError(Exception):
     pass
 
 
-class ParseKettleXml(object):
+class KettleNode(object):
+
+    def __init__(self, element):
+        self._xml_element = element
+
+
+    def get_attribute(self, attribute):
+        """
+        Get attribute from step
+        :param attributes: str, name of step attribute
+        """
+        try:
+            return self._xml_element.find(attribute).text
+        except AttributeError:
+            raise KettleParserError("Unable to find attribute {}".format(attribute))
+
+
+class Parse(object):
     """
     Parses kettle .ktr and .kjb files for easy manipulation by other tools
 
@@ -22,39 +39,36 @@ class ParseKettleXml(object):
     _STEPITEMS = ["name", "type"]
     # Hop elements
     _ENABLED = {"Y": True, "N": False}
+    # Connection attributes
+    _CONNECTION_ATTRIBUTES = ["name", "server", "type", "access", "database", "username"]
 
-    def __init__(self, data):
-        """
-        Create object for kettle parsing.
-        :param data: str, path to kettle file
-        """
-        self.xml_data = data
+    def __init__(self, kettle_file):
 
         # Default class parameters
         self.file_type = None
-        self.steps = {}
-        self.steps_xml = {}
-        self.hops = []
         self.name = ""
-        self.graph = {}
+        self.steps = []
+        self.hops = []
+        self.error_hops = []
         self.connections = []
+        self.graph = {}
 
-        # Parse file to extract metadata
-        self._verify_file()
-        self._parse_xml()
+        # Verify and parse file
+        self._verify_file(kettle_file)
+        self._parse_xml(kettle_file)
 
 
-    def _verify_file(self):
+    def _verify_file(self, data):
         """
         Verify file ending is acceptable
         """
-        if not os.path.isfile(self.xml_data):
-            raise KettleParserError("{} does not exist".format(self.xml_data))
-        if os.path.splitext(self.xml_data)[1] not in self._FILE_ENDINGS:
+        if not os.path.isfile(data):
+            raise KettleParserError("{} does not exist".format(data))
+        if os.path.splitext(data)[1] not in self._FILE_ENDINGS:
             raise KettleParserError("Invalid Kettle file")
 
 
-    def _parse_xml(self):
+    def _parse_xml(self, data):
         """
         Coordinates parsing of XML to its component pieces.
         Will look at XML and determine the following:
@@ -63,163 +77,84 @@ class ParseKettleXml(object):
 
         Also calls parse_steps/parse_hops to get step/hop information
         """
+        # Parse xml file
         try:
-            xml_root = ET.parse(self.xml_data).getroot()
+            xml_root = ET.parse(data).getroot()
         except ET.ParseError:
             raise KettleParserError("Could not parse XML")
 
+        # Determine type of kettle file
         if xml_root.tag == "transformation":
             self.file_type = 1
-            self.name = self._get_text(xml_root, "./info/name")
+            self.name = xml_root.find("./info/name").text
         elif xml_root.tag == "job":
             self.file_type = 2
-            self.name = self._get_text(xml_root, "./name")
+            self.name = xml_root.find("./name").text
         else:
             raise KettleParserError("Invalid Kettle file")
 
-
+        # Call helper methods
         self._parse_steps(xml_root)
         self._parse_hops(xml_root)
         self._parse_connections(xml_root)
+        self._parse_error_handling(xml_root)
         self._build_graph()
 
 
     def _parse_steps(self, xml_root):
         """
-        Build dictionary of steps key="name", value="type", since name is always
-        going to be unique
+        Build list of step objects
         """
-        # Loop through all steps
         if self.file_type == 1:
-            step_node = "step"
+            step_path = "step"
         elif self.file_type == 2:
-            step_node = "entry"
-        try:
-            for step in xml_root.iter(step_node):
-                try:
-                    self.steps[self._get_text(step, "name")] = {"type": self._get_text(step, "type")}
-                    self.steps_xml[self._get_text(step, "name")] = step
-                except AttributeError, e:
-                    # no "text" typically means a nested step element, so let's ignore for now
-                    continue
-        except AttributeError, e:
-            raise KettleParserError(e.message)
+            step_path = "./entries/entry"
+        for step_elem in xml_root.findall(step_path):
+            self.steps.append(KettleNode(step_elem))
 
 
     def _parse_hops(self, xml_root):
         """
-        Parse hop metadata and construct hop property ("step_name_from", "step_name_to", "enabled")
-            step_name_from: str, name of step that hop originates from
-            step_name_to: str, name of step that hop ends at
-            enabled: bool, is hop enabled?
-            ex: (Sort rows, Group by, True)
+        Build list of hop objects
         """
         if self.file_type == 1:
-            error_hops = self._parse_error_handling_trans(xml_root)
-        # Loop through all hops
-        try:
-            for hop in xml_root.iter("hop"):
-                _is_enabled = self._ENABLED[self._get_text(hop, "enabled")]
-                _step_from = self._get_text(hop, "from")
-                _step_to = self._get_text(hop, "to")
-
-                # Check for error handling
-                _is_error = False
-                for error in error_hops:
-                    if error["from"] == _step_from and error["to"] == _step_to:
-                        _is_error = True
-                    else:
-                        _is_error = self._ENABLED[self._get_text(hop, "evaluation")]
-
-                self.hops.append({"from": _step_from,
-                                  "to": _step_to,
-                                  "enabled": _is_enabled,
-                                  "error": _is_error})
-        except AttributeError, e:
-            raise KettleParserError(e.message)
+            hop_path = "./order"
+        elif self.file_type == 2:
+            hop_path = "./hops"
+        for hop_elem in xml_root.find(hop_path):
+            self.hops.append(KettleNode(hop_elem))
 
 
     def _parse_connections(self, xml_root):
         """
-        Get list of connection XML element objects. Specify certain access type if desired to narrow results.
-        :return: list, connection XML elements
+        Build list of connection objects
         """
-
-        if self.file_type == "transformation":
-            for connection in xml_root.iter("connection"):
-                try:
-                    conn = {"name": self._get_text(connection, "name"),
-                            "server": self._get_text(connection, "server"),
-                            "type": self._get_text(connection, "type"),
-                            "access": self._get_text(connection, "access"),
-                            "database": self._get_text(connection, "database"),
-                            "username": self._get_text(connection, "username")}
-                except AttributeError:
-                    pass
-            self.connections.append(conn)
+        for connection_elem in xml_root.findall("connection"):
+            connection = KettleNode(connection_elem)
+            for attribute in self._CONNECTION_ATTRIBUTES:
+                connection.get_attribute(attribute)
+            self.connections.append(connection)
 
 
-    def _parse_error_handling_trans(self, xml_root):
-        error_handling = []
-        try:
-            for error_handle in xml_root.iter("error"):
-                try:
-                    error_handling.append({"from": self.steps[self._get_text(error_handle, "source_step")],
-                                           "to": self.steps[self._get_text(error_handle, "target_step")],
-                                           "enabled": self._ENABLED[self._get_text(error_handle, "is_enabled")]})
-                except KeyError:
-                    continue
-        except AttributeError, e:
-            raise KettleParserError(e.message)
-        return error_handling
+    def _parse_error_handling(self, xml_root):
+        """
+        Build list of error handling objects
+        """
+        for error_elem in xml_root.findall("./step_error_handling/error"):
+            self.error_hops.append(KettleNode(error_elem))
 
 
     def _build_graph(self):
         """
         Only include hops that are enabled.
-        :return:
         """
         for hop in self.hops:
-            if not hop["enabled"]:
+            if not hop.get_attribute("enabled"):
                 continue
-            if hop["from"] not in self.graph:
-                self.graph[hop["from"]] = [hop["to"]]
+            if hop.get_attribute("from") not in self.graph:
+                self.graph[hop.get_attribute("from")] = [hop.get_attribute("to")]
             else:
-                self.graph[hop["from"]].append(hop["to"])
-
-
-    def _get_text(self, element, path):
-        """
-        Return text from XML element
-        :param element: xml element object to search in
-        :param path: str, tag name or path
-        :return: step_type: str
-        """
-        return element.find(path).text
-
-
-    def _name_type_lookup(self, step_name):
-        """
-        This method allows us to get the step type from the step name. This is needed
-        because hop metadata in XML only stores step name and not step type.
-        :param step_name: str
-        :return: step_type: str
-        """
-        return self.steps.get(step_name)["type"]
-
-
-    def get_step_attribute(self, step_name, attribute):
-        """
-        Given an xml element, parse out given attributes text values
-        :param element: single step xml element
-        :param attributes: list of attributes to parse from xml
-        :return: dictionary of attributes and values
-        """
-        try:
-            self.steps[step_name][attribute] = self.steps_xml[step_name].find(attribute).text
-        except AttributeError, e:
-            raise KettleParserError("Invalid attribute {} for step {}".format(attribute, step_name))
-        return self.steps[step_name][attribute]
+                self.graph[hop.get_attribute("from")].append(hop.get_attribute("to"))
 
 
     def find_all_paths(self, start, end, path=None):
@@ -242,30 +177,39 @@ class ParseKettleXml(object):
 
 
     def get_enabled_hops(self):
-        return [hop for hop in self.hops if hop["enabled"]]
+        return [hop for hop in self.hops if hop.get_attribute("enabled")]
 
 
     def get_disabled_hops(self):
-        return [hop for hop in self.hops if not hop["enabled"]]
+        return [hop for hop in self.hops if not hop.get_attribute("enabled")]
 
 
     def get_enabled_steps(self):
-        enabled_hops = self.get_enabled_hops()
         enabled_from = []
         enabled_to = []
-        for step in enabled_hops:
-            enabled_from.append(step["from"])
-            enabled_to.append(step["to"])
+        for hop in self.get_enabled_hops():
+            enabled_from.append(hop.get_attribute("from"))
+            enabled_to.append(hop.get_attribute("to"))
         enabled_names = list(set(enabled_from + enabled_to))
-        return {step: meta for step, meta in self.steps.iteritems() if step in enabled_names}
+        return [step for step in self.steps if step.get_attribute("name") in enabled_names]
 
 
     def get_disabled_steps(self):
-        disabled_hops = self.get_disabled_hops()
         disabled_from = []
         disabled_to = []
-        for step in disabled_hops:
-            disabled_from.append(step["from"])
-            disabled_to.append(step["to"])
+        for hop in self.get_disabled_hops():
+            disabled_from.append(hop.get_attribute("from"))
+            disabled_to.append(hop.get_attribute("to"))
         disabled_names = list(set(disabled_from + disabled_to))
-        return {step: meta for step, meta in self.steps.iteritems() if step in disabled_names}
+        return [step for step in self.steps if step.get_attribute("name") in disabled_names]
+
+
+    def get_error_hops(self):
+        error_hops = []
+        for hop in self.hops:
+            for error_hop in self.error_hops:
+                source = error_hop.get_attribute("source_step")
+                target = error_hop.get_attribute("target_step")
+                if source == hop.get_attribute("from") and target == hop.get_attribute("to"):
+                    error_hops.append(hop)
+        return error_hops
