@@ -1,6 +1,12 @@
 KettleParser
 ============
 
+.. image:: https://travis-ci.org/graphiq-data/KettleParser.svg?branch=master
+    :target: https://travis-ci.org/graphiq-data/KettleParser
+
+.. image:: https://badge.fury.io/py/KettleParser.svg
+    :target: https://badge.fury.io/py/KettleParser
+
 .. contents::
 
 
