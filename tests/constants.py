@@ -1,4 +1,6 @@
-TRANSFORMATION_1_FILE = "transformation_1/transformation_1.ktr"
+import os
+
+TRANSFORMATION_1_FILE = os.path.join(os.path.dirname(__file__), "transformation_1/transformation_1.ktr")
 
 TRANSFORMATION_1_STEPS = {'Dummy (do nothing)': {'type': 'Dummy'}, 'Select values': {'type': 'SelectValues'},
                           'Text file output': {'type': 'TextFileOutput'}, 'Filter rows': {'type': 'FilterRows'},
